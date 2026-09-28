@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SeasonStatus {
+  DRAFT
+  LIVE
+  PAUSED
+  FROZEN
+}
+
+enum RunStatus {
+  VALID
+  SUSPICIOUS
+  REJECTED
+}
+
+enum RewardStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  walletAddress String    @unique
+  pinHash       String
+  bestDistance  Int       @default(0)
+  isSuspended   Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions Session[]
+  runs     GameRun[]
+  rewards  Reward[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Season {
+  id        String       @id @default(cuid())
+  name      String       @unique
+  startDate DateTime
+  endDate   DateTime
+  status    SeasonStatus @default(DRAFT)
+  createdAt DateTime     @default(now())
+
+  runs    GameRun[]
+  rewards Reward[]
+}
+
+model GameRun {
+  id               String    @id @default(cuid())
+  userId           String
+  seasonId         String
+  distance         Int
+  durationMs       Int
+  collectibles     Int
+  startedAt        DateTime
+  endedAt          DateTime
+  status           RunStatus @default(VALID)
+  validationReason String?
+  createdAt        DateTime  @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@index([seasonId, distance])
+  @@index([userId, createdAt])
+}
+
+model Reward {
+  id              String       @id @default(cuid())
+  seasonId        String
+  userId          String
+  rank            Int
+  amount          String
+  walletAddress   String
+  status          RewardStatus @default(PENDING)
+  transactionHash String?
+  createdAt       DateTime     @default(now())
+
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, rank])
+}
+
+model Admin {
+  id         String   @id @default(cuid())
+  username   String   @unique
+  secretHash String
+  createdAt  DateTime @default(now())
+}
