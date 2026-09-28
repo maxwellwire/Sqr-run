@@ -47,6 +47,15 @@ export default function SqrGame({
   const gameRef =
     useRef<GameState | null>(null);
 
+  const startGameRef =
+    useRef<(() => void) | null>(null);
+
+  const jumpRef =
+    useRef<(() => void) | null>(null);
+
+  const slideRef =
+    useRef<(() => void) | null>(null);
+
   const [
     running,
     setRunning
@@ -83,16 +92,27 @@ export default function SqrGame({
     const canvas =
       canvasRef.current;
 
-    if (!canvas) {
+    if (canvas === null) {
       return;
     }
 
-    const ctx =
+    const context =
       canvas.getContext("2d");
 
-    if (!ctx) {
+    if (context === null) {
       return;
     }
+
+    /*
+     * Typed canvas context.
+     *
+     * Using this alias prevents
+     * TypeScript from losing the
+     * null check inside nested
+     * functions.
+     */
+    const ctx: CanvasRenderingContext2D =
+      context;
 
     let animationFrame = 0;
 
@@ -102,20 +122,13 @@ export default function SqrGame({
 
     let slide = 0;
 
+    let touchStartY: number | null =
+      null;
+
     /*
-     * Resize the canvas to match
-     * its displayed size.
+     * Resize canvas.
      */
     function resizeCanvas() {
-      /*
-       * Extra null check keeps
-       * TypeScript happy during
-       * production builds.
-       */
-      if (!canvas) {
-        return;
-      }
-
       const rect =
         canvas.getBoundingClientRect();
 
@@ -156,20 +169,22 @@ export default function SqrGame({
     );
 
     /*
-     * Jump action.
+     * Jump player.
      */
     function jumpPlayer() {
-      if (!gameRef.current) {
-        return;
-      }
+      const game =
+        gameRef.current;
 
-      if (gameRef.current.dead) {
+      if (
+        game === null ||
+        game.dead
+      ) {
         return;
       }
 
       /*
-       * Do not allow repeated
-       * jumps while already in air.
+       * Prevent repeated jumps
+       * while already airborne.
        */
       if (jump > 0.15) {
         return;
@@ -179,14 +194,16 @@ export default function SqrGame({
     }
 
     /*
-     * Slide action.
+     * Slide player.
      */
     function slidePlayer() {
-      if (!gameRef.current) {
-        return;
-      }
+      const game =
+        gameRef.current;
 
-      if (gameRef.current.dead) {
+      if (
+        game === null ||
+        game.dead
+      ) {
         return;
       }
 
@@ -225,13 +242,89 @@ export default function SqrGame({
     );
 
     /*
-     * Finish the current run.
+     * Touch controls.
+     *
+     * Tap = jump
+     * Swipe down = slide
+     */
+    function touchStartHandler(
+      event: TouchEvent
+    ) {
+      if (
+        event.touches.length === 0
+      ) {
+        return;
+      }
+
+      touchStartY =
+        event.touches[0].clientY;
+    }
+
+    function touchEndHandler(
+      event: TouchEvent
+    ) {
+      if (touchStartY === null) {
+        return;
+      }
+
+      if (
+        event.changedTouches.length === 0
+      ) {
+        touchStartY = null;
+        return;
+      }
+
+      const endY =
+        event.changedTouches[0].clientY;
+
+      const difference =
+        endY - touchStartY;
+
+      touchStartY = null;
+
+      /*
+       * Swipe down.
+       */
+      if (difference > 35) {
+        slidePlayer();
+        return;
+      }
+
+      /*
+       * Normal tap.
+       */
+      if (Math.abs(difference) < 35) {
+        jumpPlayer();
+      }
+    }
+
+    canvas.addEventListener(
+      "touchstart",
+      touchStartHandler,
+      {
+        passive: true
+      }
+    );
+
+    canvas.addEventListener(
+      "touchend",
+      touchEndHandler,
+      {
+        passive: true
+      }
+    );
+
+    /*
+     * Finish current run.
      */
     async function finishGame() {
       const game =
         gameRef.current;
 
-      if (!game || game.dead) {
+      if (
+        game === null ||
+        game.dead
+      ) {
         return;
       }
 
@@ -249,7 +342,10 @@ export default function SqrGame({
         Date.now();
 
       const duration =
-        endedAt - game.start;
+        Math.max(
+          0,
+          endedAt - game.start
+        );
 
       const finalDistance =
         Math.floor(
@@ -292,15 +388,21 @@ export default function SqrGame({
           );
 
         if (!response.ok) {
+          const errorText =
+            await response.text();
+
           throw new Error(
-            `Run submission failed: ${response.status}`
+            `Run submission failed: ${response.status} ${errorText}`
           );
         }
 
         const result =
           await response.json();
 
-        if (result.newBest) {
+        if (
+          result &&
+          result.newBest
+        ) {
           setBest(
             finalDistance
           );
@@ -316,7 +418,7 @@ export default function SqrGame({
     }
 
     /*
-     * Draw the complete game.
+     * Draw game.
      */
     function drawGame(
       width: number,
@@ -408,7 +510,7 @@ export default function SqrGame({
       );
 
       /*
-       * Ground grass line.
+       * Grass line.
        */
       ctx.fillStyle =
         "#3e7c3b";
@@ -442,7 +544,7 @@ export default function SqrGame({
         ctx.fill();
 
         /*
-         * Small highlight.
+         * Highlight.
          */
         ctx.fillStyle =
           "#fff3a3";
@@ -517,7 +619,7 @@ export default function SqrGame({
           ctx.fill();
 
           /*
-           * Wings.
+           * Left wing.
            */
           ctx.beginPath();
 
@@ -531,6 +633,9 @@ export default function SqrGame({
 
           ctx.fill();
 
+          /*
+           * Right wing.
+           */
           ctx.beginPath();
 
           ctx.arc(
@@ -546,7 +651,7 @@ export default function SqrGame({
       }
 
       /*
-       * Original squirrel body.
+       * Squirrel body.
        */
       ctx.fillStyle =
         "#a95b28";
@@ -687,7 +792,7 @@ export default function SqrGame({
       ctx.fill();
 
       /*
-       * Simple running legs.
+       * Running legs.
        */
       ctx.strokeStyle =
         "#713d20";
@@ -738,6 +843,21 @@ export default function SqrGame({
         18,
         30
       );
+
+      /*
+       * Collectible HUD.
+       */
+      ctx.fillStyle =
+        "#ffffff";
+
+      ctx.font =
+        "700 14px Arial";
+
+      ctx.fillText(
+        `SQR: ${game.collectibles}`,
+        18,
+        52
+      );
     }
 
     /*
@@ -749,7 +869,10 @@ export default function SqrGame({
       const game =
         gameRef.current;
 
-      if (!game || game.dead) {
+      if (
+        game === null ||
+        game.dead
+      ) {
         return;
       }
 
@@ -767,11 +890,7 @@ export default function SqrGame({
         currentTime;
 
       /*
-       * Difficulty increases
-       * as distance grows.
-       *
-       * Speed is measured in
-       * metres per second.
+       * Difficulty.
        */
       game.speed =
         Math.min(
@@ -781,9 +900,7 @@ export default function SqrGame({
         );
 
       /*
-       * IMPORTANT:
-       * Distance is now aligned
-       * with the server validator.
+       * Distance in metres.
        */
       game.distance +=
         game.speed * delta;
@@ -794,7 +911,8 @@ export default function SqrGame({
       jump =
         Math.max(
           0,
-          jump - delta * 2.3
+          jump -
+            delta * 2.3
         );
 
       /*
@@ -855,10 +973,6 @@ export default function SqrGame({
 
       /*
        * Move obstacles.
-       *
-       * 60 is used for visual
-       * pixel movement, while
-       * distance uses metres/sec.
        */
       for (
         const obstacle of
@@ -918,14 +1032,18 @@ export default function SqrGame({
           continue;
         }
 
+        /*
+         * Logs can be jumped.
+         * Birds can be avoided
+         * by sliding.
+         */
         const dangerous =
           obstacle.type === "log"
             ? jump < 0.3
             : slide <= 0;
 
         if (dangerous) {
-          finishGame();
-
+          void finishGame();
           return;
         }
       }
@@ -954,10 +1072,6 @@ export default function SqrGame({
               return false;
             }
 
-            /*
-             * Remove items that
-             * have gone off-screen.
-             */
             return (
               item.x > -50
             );
@@ -965,8 +1079,7 @@ export default function SqrGame({
         );
 
       /*
-       * Remove obstacles that
-       * have left the screen.
+       * Remove old obstacles.
        */
       game.obstacles =
         game.obstacles.filter(
@@ -975,7 +1088,7 @@ export default function SqrGame({
         );
 
       /*
-       * Draw everything.
+       * Draw.
        */
       drawGame(
         width,
@@ -1000,7 +1113,7 @@ export default function SqrGame({
       );
 
       /*
-       * Continue game loop.
+       * Continue loop.
        */
       animationFrame =
         requestAnimationFrame(
@@ -1009,11 +1122,14 @@ export default function SqrGame({
     }
 
     /*
-     * Start a new game.
+     * Start new game.
      */
     function startGame() {
       const now =
         Date.now();
+
+      const performanceNow =
+        performance.now();
 
       gameRef.current = {
         start: now,
@@ -1029,10 +1145,10 @@ export default function SqrGame({
         items: [],
 
         lastObstacleSpawn:
-          performance.now(),
+          performanceNow,
 
         lastItemSpawn:
-          performance.now(),
+          performanceNow,
 
         dead: false
       };
@@ -1052,7 +1168,7 @@ export default function SqrGame({
       setRunning(true);
 
       lastTime =
-        performance.now();
+        performanceNow;
 
       cancelAnimationFrame(
         animationFrame
@@ -1065,34 +1181,16 @@ export default function SqrGame({
     }
 
     /*
-     * Expose controls to the
-     * React buttons.
+     * Give React access to
+     * the game controls.
      */
-    (
-      window as unknown as {
-        sqrStart?: () => void;
-        sqrJump?: () => void;
-        sqrSlide?: () => void;
-      }
-    ).sqrStart =
+    startGameRef.current =
       startGame;
 
-    (
-      window as unknown as {
-        sqrStart?: () => void;
-        sqrJump?: () => void;
-        sqrSlide?: () => void;
-      }
-    ).sqrJump =
+    jumpRef.current =
       jumpPlayer;
 
-    (
-      window as unknown as {
-        sqrStart?: () => void;
-        sqrJump?: () => void;
-        sqrSlide?: () => void;
-      }
-    ).sqrSlide =
+    slideRef.current =
       slidePlayer;
 
     /*
@@ -1113,68 +1211,82 @@ export default function SqrGame({
         keyboardHandler
       );
 
-      const controls =
-        window as unknown as {
-          sqrStart?: () => void;
-          sqrJump?: () => void;
-          sqrSlide?: () => void;
-        };
+      canvas.removeEventListener(
+        "touchstart",
+        touchStartHandler
+      );
 
-      delete controls.sqrStart;
-      delete controls.sqrJump;
-      delete controls.sqrSlide;
+      canvas.removeEventListener(
+        "touchend",
+        touchEndHandler
+      );
+
+      startGameRef.current =
+        null;
+
+      jumpRef.current =
+        null;
+
+      slideRef.current =
+        null;
     };
   }, []);
 
   /*
-   * React button:
-   * Start game.
+   * Start button.
    */
-  function startGame() {
+  function handleStartGame() {
     setNewBest(false);
 
-    (
-      window as unknown as {
-        sqrStart?: () => void;
-      }
-    ).sqrStart?.();
+    startGameRef.current?.();
   }
 
   /*
-   * React button:
-   * Jump.
+   * Jump button.
    */
-  function jump() {
-    (
-      window as unknown as {
-        sqrJump?: () => void;
-      }
-    ).sqrJump?.();
+  function handleJump() {
+    jumpRef.current?.();
   }
 
   /*
-   * React button:
-   * Slide.
+   * Slide button.
    */
-  function slide() {
-    (
-      window as unknown as {
-        sqrSlide?: () => void;
-      }
-    ).sqrSlide?.();
+  function handleSlide() {
+    slideRef.current?.();
+  }
+
+  /*
+   * Share run on X.
+   */
+  function shareOnX() {
+    const message =
+      `🐿️ I just survived ${distance}m in SQR RUN! Can you beat me? #SQR #SQRRUN`;
+
+    const url =
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+        message
+      )}`;
+
+    window.open(
+      url,
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
   return (
     <main className="page">
       <div className="game">
 
+        {/* HEADER */}
         <div
           style={{
             display: "flex",
             justifyContent:
               "space-between",
             alignItems: "center",
-            padding: "10px 0"
+            padding: "10px 0",
+            gap: 12
           }}
         >
           <div className="brand">
@@ -1187,11 +1299,13 @@ export default function SqrGame({
           </div>
         </div>
 
+        {/* GAME CANVAS */}
         <div className="canvas">
           <canvas
             ref={canvasRef}
           />
 
+          {/* START SCREEN */}
           {!running &&
             !gameOver && (
               <div className="over">
@@ -1210,9 +1324,10 @@ export default function SqrGame({
                   </p>
 
                   <button
+                    type="button"
                     className="btn"
                     onClick={
-                      startGame
+                      handleStartGame
                     }
                   >
                     START RUN
@@ -1221,6 +1336,7 @@ export default function SqrGame({
               </div>
             )}
 
+          {/* GAME OVER SCREEN */}
           {gameOver && (
             <div className="over">
               <div>
@@ -1284,15 +1400,17 @@ export default function SqrGame({
                   }}
                 >
                   <button
+                    type="button"
                     className="btn"
                     onClick={
-                      startGame
+                      handleStartGame
                     }
                   >
                     PLAY AGAIN
                   </button>
 
                   <button
+                    type="button"
                     className="btn secondary"
                     onClick={() =>
                       router.push(
@@ -1304,15 +1422,10 @@ export default function SqrGame({
                   </button>
 
                   <button
+                    type="button"
                     className="btn secondary"
-                    onClick={() =>
-                      window.open(
-                        `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                          `🐿️ I just survived ${distance}m in SQR RUN! Can you beat me? #SQR #SQRRUN`
-                        )}`,
-                        "_blank",
-                        "noopener,noreferrer"
-                      )
+                    onClick={
+                      shareOnX
                     }
                   >
                     SHARE ON X
@@ -1323,28 +1436,35 @@ export default function SqrGame({
           )}
         </div>
 
+        {/* MOBILE CONTROLS */}
         <div className="touch">
           <button
             type="button"
-            onClick={jump}
+            onClick={
+              handleJump
+            }
           >
             JUMP
           </button>
 
           <button
             type="button"
-            onClick={slide}
+            onClick={
+              handleSlide
+            }
           >
             SLIDE
           </button>
         </div>
 
+        {/* CONTROL HELP */}
         <div
           style={{
             display: "flex",
             justifyContent:
               "space-between",
-            marginTop: 12
+            marginTop: 12,
+            gap: 12
           }}
         >
           <span className="muted">
@@ -1355,6 +1475,7 @@ export default function SqrGame({
             ↓ = Slide
           </span>
         </div>
+
       </div>
     </main>
   );
