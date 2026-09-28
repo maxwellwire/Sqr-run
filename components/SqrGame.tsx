@@ -89,13 +89,28 @@ export default function SqrGame({
   const router = useRouter();
 
   useEffect(() => {
-    const canvas =
+    /*
+     * Get the canvas once.
+     *
+     * We create a separate local variable
+     * and explicitly type it as HTMLCanvasElement.
+     * This prevents TypeScript from thinking
+     * the canvas may become null inside
+     * nested functions.
+     */
+    const canvasElement =
       canvasRef.current;
 
-    if (canvas === null) {
+    if (canvasElement === null) {
       return;
     }
 
+    const canvas: HTMLCanvasElement =
+      canvasElement;
+
+    /*
+     * Get drawing context.
+     */
     const context =
       canvas.getContext("2d");
 
@@ -103,14 +118,6 @@ export default function SqrGame({
       return;
     }
 
-    /*
-     * Typed canvas context.
-     *
-     * Using this alias prevents
-     * TypeScript from losing the
-     * null check inside nested
-     * functions.
-     */
     const ctx: CanvasRenderingContext2D =
       context;
 
@@ -122,8 +129,8 @@ export default function SqrGame({
 
     let slide = 0;
 
-    let touchStartY: number | null =
-      null;
+    let touchStartY:
+      number | null = null;
 
     /*
      * Resize canvas.
@@ -169,7 +176,7 @@ export default function SqrGame({
     );
 
     /*
-     * Jump player.
+     * Jump.
      */
     function jumpPlayer() {
       const game =
@@ -182,10 +189,6 @@ export default function SqrGame({
         return;
       }
 
-      /*
-       * Prevent repeated jumps
-       * while already airborne.
-       */
       if (jump > 0.15) {
         return;
       }
@@ -194,7 +197,7 @@ export default function SqrGame({
     }
 
     /*
-     * Slide player.
+     * Slide.
      */
     function slidePlayer() {
       const game =
@@ -242,7 +245,7 @@ export default function SqrGame({
     );
 
     /*
-     * Touch controls.
+     * Mobile touch controls.
      *
      * Tap = jump
      * Swipe down = slide
@@ -291,9 +294,11 @@ export default function SqrGame({
       }
 
       /*
-       * Normal tap.
+       * Tap.
        */
-      if (Math.abs(difference) < 35) {
+      if (
+        Math.abs(difference) < 35
+      ) {
         jumpPlayer();
       }
     }
@@ -315,7 +320,7 @@ export default function SqrGame({
     );
 
     /*
-     * Finish current run.
+     * Finish game.
      */
     async function finishGame() {
       const game =
@@ -510,7 +515,7 @@ export default function SqrGame({
       );
 
       /*
-       * Grass line.
+       * Grass.
        */
       ctx.fillStyle =
         "#3e7c3b";
@@ -543,9 +548,6 @@ export default function SqrGame({
 
         ctx.fill();
 
-        /*
-         * Highlight.
-         */
         ctx.fillStyle =
           "#fff3a3";
 
@@ -573,7 +575,7 @@ export default function SqrGame({
           obstacle.type === "log"
         ) {
           /*
-           * Fallen log.
+           * Log.
            */
           ctx.fillStyle =
             "#5b3a24";
@@ -669,7 +671,7 @@ export default function SqrGame({
       ctx.fill();
 
       /*
-       * Squirrel head.
+       * Head.
        */
       ctx.beginPath();
 
@@ -792,7 +794,7 @@ export default function SqrGame({
       ctx.fill();
 
       /*
-       * Running legs.
+       * Legs.
        */
       ctx.strokeStyle =
         "#713d20";
@@ -828,7 +830,7 @@ export default function SqrGame({
       ctx.stroke();
 
       /*
-       * Distance HUD.
+       * Distance.
        */
       ctx.fillStyle =
         "#f4c744";
@@ -845,7 +847,7 @@ export default function SqrGame({
       );
 
       /*
-       * Collectible HUD.
+       * Collectibles count.
        */
       ctx.fillStyle =
         "#ffffff";
@@ -861,7 +863,7 @@ export default function SqrGame({
     }
 
     /*
-     * Main game loop.
+     * Game loop.
      */
     function gameLoop(
       currentTime: number
@@ -890,7 +892,7 @@ export default function SqrGame({
         currentTime;
 
       /*
-       * Difficulty.
+       * Increase speed with distance.
        */
       game.speed =
         Math.min(
@@ -1016,7 +1018,7 @@ export default function SqrGame({
           0.3;
 
       /*
-       * Collision detection.
+       * Collision.
        */
       for (
         const obstacle of
@@ -1032,11 +1034,6 @@ export default function SqrGame({
           continue;
         }
 
-        /*
-         * Logs can be jumped.
-         * Birds can be avoided
-         * by sliding.
-         */
         const dangerous =
           obstacle.type === "log"
             ? jump < 0.3
@@ -1044,12 +1041,13 @@ export default function SqrGame({
 
         if (dangerous) {
           void finishGame();
+
           return;
         }
       }
 
       /*
-       * Collectibles.
+       * Collect items.
        */
       game.items =
         game.items.filter(
@@ -1100,7 +1098,7 @@ export default function SqrGame({
       );
 
       /*
-       * Update React HUD.
+       * Update UI.
        */
       setDistance(
         Math.floor(
@@ -1113,7 +1111,7 @@ export default function SqrGame({
       );
 
       /*
-       * Continue loop.
+       * Continue.
        */
       animationFrame =
         requestAnimationFrame(
@@ -1122,7 +1120,7 @@ export default function SqrGame({
     }
 
     /*
-     * Start new game.
+     * Start game.
      */
     function startGame() {
       const now =
@@ -1181,8 +1179,7 @@ export default function SqrGame({
     }
 
     /*
-     * Give React access to
-     * the game controls.
+     * Store controls in refs.
      */
     startGameRef.current =
       startGame;
@@ -1233,7 +1230,7 @@ export default function SqrGame({
   }, []);
 
   /*
-   * Start button.
+   * Start game button.
    */
   function handleStartGame() {
     setNewBest(false);
@@ -1256,7 +1253,7 @@ export default function SqrGame({
   }
 
   /*
-   * Share run on X.
+   * Share on X.
    */
   function shareOnX() {
     const message =
@@ -1299,7 +1296,7 @@ export default function SqrGame({
           </div>
         </div>
 
-        {/* GAME CANVAS */}
+        {/* GAME */}
         <div className="canvas">
           <canvas
             ref={canvasRef}
@@ -1336,7 +1333,7 @@ export default function SqrGame({
               </div>
             )}
 
-          {/* GAME OVER SCREEN */}
+          {/* GAME OVER */}
           {gameOver && (
             <div className="over">
               <div>
@@ -1457,7 +1454,7 @@ export default function SqrGame({
           </button>
         </div>
 
-        {/* CONTROL HELP */}
+        {/* CONTROLS HELP */}
         <div
           style={{
             display: "flex",
